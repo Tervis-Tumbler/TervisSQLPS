@@ -82,3 +82,28 @@ function Get-SQLIndexName {
 SELECT name FROM sys.indexes WHERE object_id = $ObjectID and index_id = $IndexID
 "@
 }
+
+function Get-SQLSPWho2 {
+    param (
+        $ComputerName
+    )
+   
+    Invoke-SQL -dataSource $ComputerName -database Master -sqlCommand "exec sp_who2"
+}
+
+function Get-GhostCleanUpTasksRunning {
+    param (
+        $ComputerName
+    )
+    Get-SQLSPWho2 -ComputerName $ComputerName | 
+    where command -Match ghost
+}
+
+function Get-ConnectionsToSpecificDatabase {
+    param (
+        $ComputerName,
+        $DatabaseName
+    )
+    Get-SQLSPWho2 -ComputerName $ComputerName | 
+    where DBName -EQ $DatabaseName
+}
