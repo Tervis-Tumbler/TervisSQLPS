@@ -61,22 +61,22 @@ SELECT * FROM sys.dm_db_index_physical_stats
 "@
 }
 
-function Get-SQLObjectName {
+function Get-SQLTableNameFromObjectID {
     param (
         $ComputerName,
         $DatabaseID,
-        $ObjectID
+        $TableObjectID
     )
     Invoke-SQL -dataSource $ComputerName -database Master -sqlCommand @"
 select OBJECT_NAME ($ObjectID, $DatabaseID)
 "@
 }
 
-function Get-SQLIndexName {
+function Get-SQLIndexNameFromID {
     param (
         $ComputerName,
         $IndexID,
-        $ObjectID
+        $TableObjectID
     )
     Invoke-SQL -dataSource $ComputerName -database $DatabaseName -sqlCommand @"
 SELECT name FROM sys.indexes WHERE object_id = $ObjectID and index_id = $IndexID
