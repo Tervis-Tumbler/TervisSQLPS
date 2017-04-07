@@ -137,3 +137,29 @@ SELECT * FROM $TableName with (nolock)
     }
 
 }
+
+function Enable-SQLRemoteAccess {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        $InstanceName = "MSSQL10_50.MSSQLSERVER"
+    )
+    begin {
+        $SQLTCPKeyPath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$InstanceName\MSSQLServer\SuperSocketNetLib\Tcp"
+    }
+    process {
+        Write-Verbose "Enabling SQL remote access"
+        Invoke-Command -ComputerName $ComputerName -ScriptBlock {        
+            $SQLTCPKey = Get-ItemProperty -Path $Using:SQLTCPKeyPath
+            if (-not $SQLTCPKey.Enabled) {
+                Set-ItemProperty -Path $Using:SQLTCPKeyPath -Name Enabled -Value 1
+                $ServiceName = if ($Using:InstanceName) {
+                    "MSSQL`$$Using:InstanceName"
+                } else {
+                    "MSSQLServer"
+                }               
+                Restart-Service -Name $ServiceName -Force
+            }
+        }
+    }
+}
