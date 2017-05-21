@@ -173,6 +173,18 @@ function Enable-SQLRemoteAccess {
     }
 }
 
+function Set-SQLTCPEnabled {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        $InstanceName = "MSSQLServer",
+        [ValidateSet("x86","x64")]$Architecture = "x64"
+    )
+    process {
+        Set-SQLSuperSocketNetLibRegistryProperty -ComputerName $ComputerName -InstanceName $InstanceName -Architecture $Architecture -Name Enabled -RelativePath "\Tcp" -Value 1
+    }
+}
+
 function Get-SQLTCPEnabled {
     [CmdletBinding()]
     param (
@@ -207,7 +219,7 @@ function Get-SQLNetConnection {
     }
 }
 
-function New-SQLFirewallRules {
+function New-SQLNetFirewallRule {
     param (
         [Parameter(ValueFromPipelineByPropertyName)]$ComputerName
     )
