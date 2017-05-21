@@ -142,17 +142,26 @@ function Enable-SQLRemoteAccess {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
-        $InstanceName = "MSSQL10_50.MSSQLSERVER"
+        $InstanceName = "MSSQLSERVER",
+        [ValidateSet("x86","x64")]$Architecture = "x64"
     )
     begin {
-        $SQLTCPKeyPath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$InstanceName\MSSQLServer\SuperSocketNetLib\Tcp"
+        $MicrosoftSQLServerRegistryPath = Get-MicrosoftSQLServerRegistryPath -Architecture $Architecture
+        $SQLTCPKeyRelativePath = "\MSSQLServer\SuperSocketNetLib\Tcp"
     }
     process {
         Write-Verbose "Enabling SQL remote access"
         Invoke-Command -ComputerName $ComputerName -ScriptBlock {        
-            $SQLTCPKey = Get-ItemProperty -Path $Using:SQLTCPKeyPath
-            if (-not $SQLTCPKey.Enabled) {
-                Set-ItemProperty -Path $Using:SQLTCPKeyPath -Name Enabled -Value 1
+            $SQLVersionAndInstanceName = Get-ChildItem -Path $Using:MicrosoftSQLServerRegistryPath | 
+            where PSChildName -Match "\.$Using:InstanceName" |
+            select -ExpandProperty PSChildName
+
+            $SQLTCPKeyPath = $Using:MicrosoftSQLServerRegistryPath + "\$SQLVersionAndInstanceName" + $Using:SQLTCPKeyRelativePath
+            $Enabled = Get-ItemProperty -Path $SQLTCPKeyPath -Name Enabled |
+            select -ExpandProperty Enabled
+
+            if (-not $Enabled) {
+                Set-ItemProperty -Path $SQLTCPKeyPath -Name Enabled -Value 1
                 $ServiceName = if ($Using:InstanceName) {
                     "MSSQL`$$Using:InstanceName"
                 } else {
@@ -161,5 +170,113 @@ function Enable-SQLRemoteAccess {
                 Restart-Service -Name $ServiceName -Force
             }
         }
+    }
+}
+
+function Get-SQLRemoteAccess {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        $InstanceName = "MSSQLServer",
+        [ValidateSet("x86","x64")]$Architecture = "x64"
+    )
+    begin {
+        $MicrosoftSQLServerRegistryPath = Get-MicrosoftSQLServerRegistryPath -Architecture $Architecture
+        $SQLTCPKeyRelativePath = "\MSSQLServer\SuperSocketNetLib\Tcp"
+    }
+    process {
+        Invoke-Command -ComputerName $ComputerName -ScriptBlock {
+            $SQLVersionAndInstanceName = Get-ChildItem -Path $Using:MicrosoftSQLServerRegistryPath | 
+            where PSChildName -Match "\.$Using:InstanceName" |
+            select -ExpandProperty PSChildName
+
+            $SQLTCPKeyPath = $Using:MicrosoftSQLServerRegistryPath + "\$SQLVersionAndInstanceName" + $Using:SQLTCPKeyRelativePath
+            Get-ItemProperty -Path $SQLTCPKeyPath -Name Enabled |
+            select -ExpandProperty Enabled
+        }
+    }
+}
+
+function Get-SQLSuperSocketNetLibRegistryPropertyPath {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        $InstanceName = "MSSQLSERVER",
+        [ValidateSet("x86","x64")]$Architecture = "x64",
+        [Parameter(Mandatory)]$RelativePath
+    )
+    begin {
+        $MicrosoftSQLServerRegistryPath = Get-MicrosoftSQLServerRegistryPath -Architecture $Architecture
+        $SuperSocketNetLibRelativePath = "\MSSQLServer\SuperSocketNetLib"
+    }
+    process {
+        Invoke-Command -ComputerName $ComputerName -ScriptBlock {        
+            $SQLVersionAndInstanceName = Get-ChildItem -Path $Using:MicrosoftSQLServerRegistryPath | 
+            where PSChildName -Match "\.$Using:InstanceName" |
+            select -ExpandProperty PSChildName
+
+            $SQLKeyPath = $Using:MicrosoftSQLServerRegistryPath + "\$SQLVersionAndInstanceName" + $Using:SuperSocketNetLibRelativePath + $Using:RelativePath
+            $SQLKeyPath
+        }
+    }
+
+}
+
+function Get-SQLSuperSocketNetLibRegistryProperty {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        $InstanceName = "MSSQLSERVER",
+        [ValidateSet("x86","x64")]$Architecture = "x64",
+        [Parameter(Mandatory)]$Name,
+        [Parameter(Mandatory)]$RelativePath,
+        [Parameter(Mandatory)]$Value
+    )
+    process {
+        $SQLKeyPath = Get-SQLSuperSocketNetLibRegistryPropertyPath -ComputerName $ComputerName -InstanceName $InstanceName -Architecture $Architecture -RelativePath $RelativePath
+        Invoke-Command -ComputerName $ComputerName -ScriptBlock {        
+            Get-ItemProperty -Path $Using:SQLKeyPath -Name $Using:Name |
+            select -ExpandProperty $Using:Name
+        }
+    }
+}
+
+function Set-SQLSuperSocketNetLibRegistryProperty {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        $InstanceName = "MSSQLSERVER",
+        [ValidateSet("x86","x64")]$Architecture = "x64",
+        [Parameter(Mandatory)]$Name,
+        [Parameter(Mandatory)]$RelativePath,
+        [Parameter(Mandatory)]$Value
+    )
+    process {
+        $SQLKeyPath = Get-SQLSuperSocketNetLibRegistryPropertyPath -ComputerName $ComputerName -InstanceName $InstanceName -Architecture $Architecture -RelativePath $RelativePath
+        Invoke-Command -ComputerName $ComputerName -ScriptBlock {        
+            $CurrentValue = Get-ItemProperty -Path $Using:SQLKeyPath -Name $Using:Name |
+            select -ExpandProperty $Using:Name
+
+            if ($CurrentValue -ne $Using:Value) {
+                Set-ItemProperty -Path $Using:SQLKeyPath -Name $Using:Name -Value $Using:Value
+                $ServiceName = if ($Using:InstanceName) {
+                    "MSSQL`$$Using:InstanceName"
+                } else {
+                    "MSSQLServer"
+                }               
+                Restart-Service -Name $ServiceName -Force
+            }
+        }
+    }
+}
+
+function Get-MicrosoftSQLServerRegistryPath {
+    param (
+        [ValidateSet("x86","x64")]$Architecture = "x64"        
+    )
+    if ($Architecture -eq "x64") {
+            "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server"
+    } elseif ($Architecture -eq "x86") {
+            "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Microsoft SQL Server"
     }
 }
