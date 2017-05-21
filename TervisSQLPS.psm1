@@ -173,27 +173,76 @@ function Enable-SQLRemoteAccess {
     }
 }
 
-function Get-SQLRemoteAccess {
+function Get-SQLTCPEnabled {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
         $InstanceName = "MSSQLServer",
         [ValidateSet("x86","x64")]$Architecture = "x64"
     )
-    begin {
-        $MicrosoftSQLServerRegistryPath = Get-MicrosoftSQLServerRegistryPath -Architecture $Architecture
-        $SQLTCPKeyRelativePath = "\MSSQLServer\SuperSocketNetLib\Tcp"
+    process {
+        Get-SQLSuperSocketNetLibRegistryProperty -ComputerName $ComputerName -InstanceName $InstanceName -Architecture $Architecture -Name Enabled -RelativePath "\Tcp"
     }
+}
+
+function Get-SQLNetTcpConnection {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName
+    )
+    process {
+        $CimSession = New-CimSession -ComputerName $ComputerName
+        Get-NetTCPConnection -CimSession $CimSession -LocalPort 1433
+        Remove-CimSession -CimSession $CimSession
+    }
+}
+
+function Get-SQLNetConnection {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName
+    )
+    process {
+        $CimSession = New-CimSession -ComputerName $ComputerName
+        Get-NetTCPConnection -CimSession $CimSession -LocalPort 1433
+        Remove-CimSession -CimSession $CimSession
+    }
+}
+
+function New-SQLFirewallRules {
+    param (
+        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName
+    )
     process {
         Invoke-Command -ComputerName $ComputerName -ScriptBlock {
-            $SQLVersionAndInstanceName = Get-ChildItem -Path $Using:MicrosoftSQLServerRegistryPath | 
-            where PSChildName -Match "\.$Using:InstanceName" |
-            select -ExpandProperty PSChildName
-
-            $SQLTCPKeyPath = $Using:MicrosoftSQLServerRegistryPath + "\$SQLVersionAndInstanceName" + $Using:SQLTCPKeyRelativePath
-            Get-ItemProperty -Path $SQLTCPKeyPath -Name Enabled |
-            select -ExpandProperty Enabled
+            $FirewallRule = Get-NetFirewallRule -Name "MSSQL" -ErrorAction SilentlyContinue
+            if (-not $FirewallRule) {
+                New-NetFirewallRule -Name "MSSQL" -DisplayName "MSSQL" -Direction Inbound -LocalPort 1433 -Protocol TCP -Action Allow -Group MSSQL | Out-Null
+            }
         }
+    }
+}
+
+function Get-SQLTCPIPAllTcpPort {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        $InstanceName = "MSSQLServer",
+        [ValidateSet("x86","x64")]$Architecture = "x64"
+    )
+    process {
+        Get-SQLSuperSocketNetLibRegistryProperty -ComputerName $ComputerName -InstanceName $InstanceName -Architecture $Architecture -Name TcpPort -RelativePath "\Tcp\ipall"
+    }
+}
+
+function Set-SQLTCPIPAllTcpPort {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        $InstanceName = "MSSQLServer",
+        [ValidateSet("x86","x64")]$Architecture = "x64",
+        $TcpPort = 1433
+    )
+    process {
+        Set-SQLSuperSocketNetLibRegistryProperty -ComputerName $ComputerName -InstanceName $InstanceName -Architecture $Architecture -Name TcpPort -RelativePath "\Tcp\ipall" -Value $TcpPort
     }
 }
 
@@ -229,8 +278,7 @@ function Get-SQLSuperSocketNetLibRegistryProperty {
         $InstanceName = "MSSQLSERVER",
         [ValidateSet("x86","x64")]$Architecture = "x64",
         [Parameter(Mandatory)]$Name,
-        [Parameter(Mandatory)]$RelativePath,
-        [Parameter(Mandatory)]$Value
+        [Parameter(Mandatory)]$RelativePath
     )
     process {
         $SQLKeyPath = Get-SQLSuperSocketNetLibRegistryPropertyPath -ComputerName $ComputerName -InstanceName $InstanceName -Architecture $Architecture -RelativePath $RelativePath
