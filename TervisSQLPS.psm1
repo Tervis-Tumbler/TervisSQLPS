@@ -340,3 +340,21 @@ function Get-MicrosoftSQLServerRegistryPath {
             "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Microsoft SQL Server"
     }
 }
+
+function Set-SQLSecurityBuiltInAdministratorsWithSysman {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        $InstanceName = "MSSQLSERVER"
+    )
+    process {
+        $Command = @"
+USE [master]
+GO
+CREATE LOGIN [BUILTIN\administrators] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+GO
+ALTER SERVER ROLE [sysadmin] ADD MEMBER [BUILTIN\administrators]
+GO
+"@
+        Invoke-SQL -dataSource $ComputerName -database Master -sqlCommand $ComputerName
+    }
+}
