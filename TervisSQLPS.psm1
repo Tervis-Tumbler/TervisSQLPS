@@ -343,8 +343,7 @@ function Get-MicrosoftSQLServerRegistryPath {
 
 function Set-SQLSecurityBuiltInAdministratorsWithSysman {
     param (
-        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
-        $InstanceName = "MSSQLSERVER"
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName
     )
     process {
         $Command = @"
