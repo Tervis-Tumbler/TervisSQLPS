@@ -348,11 +348,8 @@ function Set-SQLSecurityBuiltInAdministratorsWithSysman {
     process {
         $Command = @"
 USE [master]
-GO
 CREATE LOGIN [BUILTIN\administrators] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
-GO
 ALTER SERVER ROLE [sysadmin] ADD MEMBER [BUILTIN\administrators]
-GO
 "@
         Invoke-SQL -dataSource $ComputerName -database Master -sqlCommand $Command
     }
