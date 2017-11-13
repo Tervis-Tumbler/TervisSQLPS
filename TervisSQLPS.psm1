@@ -354,6 +354,6 @@ GO
 ALTER SERVER ROLE [sysadmin] ADD MEMBER [BUILTIN\administrators]
 GO
 "@
-        Invoke-SQL -dataSource $ComputerName -database Master -sqlCommand $ComputerName
+        Invoke-SQL -dataSource $ComputerName -database Master -sqlCommand $Command
     }
 }
