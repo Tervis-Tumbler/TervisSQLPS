@@ -354,3 +354,17 @@ ALTER SERVER ROLE [sysadmin] ADD MEMBER [BUILTIN\administrators]
         Invoke-SQL -dataSource $ComputerName -database Master -sqlCommand $Command
     }
 }
+
+function Get-SQLFromTraceXMLFile {
+    param (
+        [Parameter(Mandatory)]$Path
+    )
+    [xml]$EventTrace = Get-Content -Path $Path
+    
+    $EventTrace.TraceData.Events.Event | ForEach-Object {
+        $TextData = $_.Column | Where-Object name -EQ "TextData" | Select-Object -ExpandProperty "#text"
+        [array]$SQLCommandArray += $TextData + "`n"
+    }
+    
+    $SQLCommandArray
+}
